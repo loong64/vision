@@ -57,8 +57,7 @@ jobs:
           CIBW_BEFORE_ALL_LINUX: >
             yum install -y ccache
           CIBW_BEFORE_BUILD_LINUX: >
-            pip install auditwheel torchvision-extra-decoders &&
-            python packaging/wheel/relocate.py
+            pip install https://github.com/loong64/auditwheel/releases/download/6.2.0/auditwheel-6.2.0-py3-none-any.whl
           CIBW_ENVIRONMENT_LINUX: >
             BUILD_VERSION=${{ env.BUILD_VERSION }}
             PIP_EXTRA_INDEX_URL="https://gitlab.com/api/v4/projects/65746188/packages/pypi/simple"
@@ -67,9 +66,18 @@ jobs:
             PATH="/usr/lib64/ccache:$HOME/.cargo/bin:$PATH"
             CCACHE_DIR="/host/home/runner/data/cache/ccache"
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
-            mkdir -p {dest_dir} &&
-            cp -f {wheel} {dest_dir} &&
-            repair_manylinux_2_38.sh {dest_dir}/*.whl
+            mkdir -p dist {dest_dir} && 
+            cp -f {wheel} dist && 
+            for pkg in dist/*-linux_*.whl; do 
+              if [[ ! -e $pkg ]]; then 
+                continue
+              fi
+              abs_pkg=$(realpath $pkg)
+              repair_manylinux_2_38.sh $abs_pkg
+            done &&
+            python packaging/wheel/relocate.py &&
+            pip install torchvision-extra-decoders &&
+            cp -f dist/*.whl {dest_dir}
 
       - name: Cache permissions
         if: always()
