@@ -96,7 +96,6 @@ jobs:
             pip install https://github.com/loong64/auditwheel/releases/download/6.2.0/auditwheel-6.2.0-py3-none-any.whl
           CIBW_ENVIRONMENT_LINUX: >
             BUILD_VERSION=${{ env.BUILD_VERSION }}
-            LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
             PIP_EXTRA_INDEX_URL="https://gitlab.com/api/v4/projects/65746188/packages/pypi/simple"
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
             mkdir -p dist {dest_dir} && 
