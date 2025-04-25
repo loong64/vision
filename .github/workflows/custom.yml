@@ -1,0 +1,95 @@
+name: custom build
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_version:
+        description: 'Build version'
+        required: true
+        default: ''
+
+jobs:
+  custom:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ['vision']
+        platform: ['cp39-manylinux_loongarch64', 'cp310-manylinux_loongarch64', 'cp311-manylinux_loongarch64', 'cp312-manylinux_loongarch64', 'cp313-manylinux_loongarch64']
+    steps:
+      - name: Get version
+        run: |
+          app_version=${{ github.event.inputs.app_version }}
+          echo "BUILD_VERSION=${app_version/v/}" >> $GITHUB_ENV
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          repository: pytorch/vision
+          ref: ${{ github.event.inputs.app_version }}
+          submodules: true
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Restore Cache
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            /home/runner/data/cache
+          key: ${{ matrix.package }}-${{ matrix.platform }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: ${{ matrix.package }}-${{ matrix.platform }}-
+
+      - name: Setup Cache
+        run: |
+          sudo mkdir -p /home/runner/data/cache/.cache
+          sudo chown -R root:docker /home/runner/data/cache
+
+      - name: Build wheels
+        uses: loong64/cibuildwheel@v2.23.2
+        env:
+          CIBW_MANYLINUX_LOONGARCH64_IMAGE: "ghcr.io/loong64/manylinuxloongarch64-builder:cpu-loongarch64"
+          CIBW_ARCHS: loongarch64
+          CIBW_BUILD: ${{ matrix.platform }}
+          CIBW_BUILD_VERBOSITY: 1
+          CIBW_TEST_SKIP: "*"
+          CIBW_BEFORE_ALL_LINUX: >
+            yum install -y ccache
+          CIBW_BEFORE_BUILD_LINUX: >
+            pip install auditwheel torchvision-extra-decoders &&
+            python packaging/wheel/relocate.py
+          CIBW_ENVIRONMENT_LINUX: >
+            BUILD_VERSION=${{ env.BUILD_VERSION }}
+            PIP_EXTRA_INDEX_URL="https://gitlab.com/api/v4/projects/65746188/packages/pypi/simple"
+            USE_CCACHE=1
+            LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
+            PATH="/usr/lib64/ccache:$HOME/.cargo/bin:$PATH"
+            CCACHE_DIR="/host/home/runner/data/cache/ccache"
+          CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
+            mkdir -p {dest_dir} &&
+            cp -f {wheel} {dest_dir} &&
+            repair_manylinux_2_38.sh {dest_dir}/*.whl
+
+      - name: Cache permissions
+        if: always()
+        run: |
+          sudo chown -R runner:docker /home/runner/data/cache
+
+      - name: Save Cache
+        if: always()
+        id: cache-save
+        uses: actions/cache/save@v4
+        with:
+          path: /home/runner/data/cache
+          key: ${{ matrix.package }}-${{ matrix.platform }}-${{ hashFiles('pyproject.toml') }}
+
+      - name: Upload wheels
+        run: |
+          pip install twine==6.0.1
+          for file in wheelhouse/*.whl; do
+            twine upload --repository-url https://gitlab.com/api/v4/projects/65746188/packages/pypi $file || true
+          done
+        env:
+          TWINE_USERNAME: ${{ github.repository_owner }}
+          TWINE_PASSWORD: ${{ secrets.GL_TOKEN }}
