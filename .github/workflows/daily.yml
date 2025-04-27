@@ -81,6 +81,19 @@ jobs:
           ref: ${{ needs.check.outputs.version }}
           submodules: true
 
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            /home/runner/data/cache
+          key: ${{ matrix.package }}-${{ matrix.platform }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: ${{ matrix.package }}-${{ matrix.platform }}-
+
+      - name: Setup Cache
+        run: |
+          sudo mkdir -p /home/runner/data/cache/.cache
+          sudo chown -R root:docker /home/runner/data/cache
+
       - name: Setup QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -91,17 +104,21 @@ jobs:
           CIBW_ARCHS: loongarch64
           CIBW_BUILD: ${{ matrix.platform }}
           CIBW_BUILD_VERBOSITY: 1
-          CIBW_TEST_SKIP: "*"
+          CIBW_BEFORE_ALL_LINUX: >
+            yum install -y ccache
           CIBW_BEFORE_BUILD_LINUX: >
             pip install https://github.com/loong64/auditwheel/releases/download/6.2.0/auditwheel-6.2.0-py3-none-any.whl
           CIBW_ENVIRONMENT_LINUX: >
             BUILD_VERSION=${{ env.BUILD_VERSION }}
             PIP_EXTRA_INDEX_URL="https://gitlab.com/api/v4/projects/65746188/packages/pypi/simple"
+            USE_CCACHE=1
+            PATH="/usr/lib64/ccache:$PATH"
+            CCACHE_DIR="/host/home/runner/data/cache/ccache"
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
-            mkdir -p dist {dest_dir} && 
-            cp -f {wheel} dist && 
-            for pkg in dist/*-linux_*.whl; do 
-              if [[ ! -e $pkg ]]; then 
+            mkdir -p dist {dest_dir} &&
+            cp -f {wheel} dist &&
+            for pkg in dist/*-linux_*.whl; do
+              if [[ ! -e $pkg ]]; then
                 continue
               fi
               abs_pkg=$(realpath $pkg)
@@ -110,6 +127,7 @@ jobs:
             python packaging/wheel/relocate.py &&
             pip install torchvision-extra-decoders &&
             cp -f dist/*.whl {dest_dir}
+          CIBW_TEST_SKIP: "*"
 
       - name: Upload wheels
         run: |
@@ -126,3 +144,7 @@ jobs:
           gh release upload ${{ needs.check.outputs.version }} -R ${{ github.repository }} wheelhouse/*.whl --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache permissions
+        run: |
+          sudo chown -R runner:docker /home/runner/data/cache
