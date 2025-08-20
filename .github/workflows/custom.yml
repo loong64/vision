@@ -46,7 +46,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Build wheels
-        uses: loong64/cibuildwheel@v2.23.2
+        uses: loong64/cibuildwheel@v3.1.4
         env:
           CIBW_MANYLINUX_LOONGARCH64_IMAGE: "ghcr.io/loong64/manylinuxloongarch64-builder:cpu-loongarch64"
           CIBW_ARCHS: loongarch64
