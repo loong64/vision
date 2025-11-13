@@ -31,6 +31,18 @@ jobs:
           echo "========== Build Args =========="
           echo "Torchvision current version: ${version}"
 
+      - name: Check pytorch
+        run: |
+          version=$(curl -s "https://api.github.com/repos/pytorch/pytorch/releases/latest" | jq -r .tag_name)
+          if [ -z "${version}" ] || [ "${version}" == "null" ]; then
+            echo "Failed to get version"
+            exit 1
+          fi
+          echo "PyTorch current version: ${version}"
+          gh release view ${version} -R https://github.com/loong64/pytorch | grep torch-.*.whl >/dev/null 2>&1 || exit 1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Check release
         id: check_release
         run: |
