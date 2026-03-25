@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         package: ['vision']
-        platform: ['cp39-manylinux_loongarch64', 'cp310-manylinux_loongarch64', 'cp311-manylinux_loongarch64', 'cp312-manylinux_loongarch64', 'cp313-manylinux_loongarch64']
+        platform: ['cp310-manylinux_loongarch64', 'cp311-manylinux_loongarch64', 'cp312-manylinux_loongarch64', 'cp313-manylinux_loongarch64', 'cp313t-manylinux_loongarch64', 'cp314-manylinux_loongarch64', 'cp314t-manylinux_loongarch64']
     steps:
       - name: Get version
         run: |
@@ -23,30 +23,17 @@ jobs:
           echo "BUILD_VERSION=${app_version/v/}" >> $GITHUB_ENV
 
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: pytorch/vision
           ref: ${{ github.event.inputs.app_version }}
           submodules: true
 
-      - name: Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            /home/runner/data/cache
-          key: ${{ matrix.package }}-${{ matrix.platform }}-${{ hashFiles('pyproject.toml') }}
-          restore-keys: ${{ matrix.package }}-${{ matrix.platform }}-
-
-      - name: Setup Cache
-        run: |
-          sudo mkdir -p /home/runner/data/cache/.cache
-          sudo chown -R root:docker /home/runner/data/cache
-
       - name: Setup QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Build wheels
-        uses: loong64/cibuildwheel@v3.1.4
+        uses: loong64/cibuildwheel@v3.4.0
         env:
           CIBW_MANYLINUX_LOONGARCH64_IMAGE: "ghcr.io/loong64/manylinuxloongarch64-builder:cpu-loongarch64"
           CIBW_ARCHS: loongarch64
@@ -59,9 +46,6 @@ jobs:
           CIBW_ENVIRONMENT_LINUX: >
             BUILD_VERSION=${{ env.BUILD_VERSION }}
             PIP_EXTRA_INDEX_URL="https://gitlab.com/api/v4/projects/65746188/packages/pypi/simple"
-            USE_CCACHE=1
-            PATH="/usr/lib64/ccache:$PATH"
-            CCACHE_DIR="/host/home/runner/data/cache/ccache"
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
             mkdir -p dist {dest_dir} &&
             cp -f {wheel} dist &&
@@ -86,7 +70,3 @@ jobs:
         env:
           TWINE_USERNAME: ${{ github.repository_owner }}
           TWINE_PASSWORD: ${{ secrets.GL_TOKEN }}
-
-      - name: Cache permissions
-        run: |
-          sudo chown -R runner:docker /home/runner/data/cache
