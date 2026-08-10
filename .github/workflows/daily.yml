@@ -97,17 +97,17 @@ jobs:
         uses: docker/setup-qemu-action@v4
 
       - name: Build wheels
-        uses: loong64/cibuildwheel@v3.4.0
+        uses: loong64/cibuildwheel@v4.1.0
         env:
           CIBW_MANYLINUX_LOONGARCH64_IMAGE: "ghcr.io/loong64/manylinuxloongarch64-builder:cpu-loongarch64"
           CIBW_ARCHS: loongarch64
           CIBW_BUILD: ${{ matrix.platform }}
+          CIBW_BUILD_FRONTEND: "pip"
           CIBW_BUILD_VERBOSITY: 1
           CIBW_BEFORE_ALL_LINUX: >
             yum install -y ccache libwebp-devel libjpeg-turbo-devel libpng-devel
           CIBW_BEFORE_BUILD_LINUX: >
             pip install https://github.com/loong64/auditwheel/releases/download/6.2.0/auditwheel-6.2.0-py3-none-any.whl
-          CIBW_ENABLE: cpython-freethreading
           CIBW_ENVIRONMENT_LINUX: >
             BUILD_VERSION=${{ env.BUILD_VERSION }}
             PIP_EXTRA_INDEX_URL="https://gitlab.com/api/v4/projects/65746188/packages/pypi/simple"
@@ -121,8 +121,6 @@ jobs:
               abs_pkg=$(realpath $pkg)
               repair_manylinux_2_38.sh $abs_pkg
             done &&
-            python packaging/wheel/relocate.py &&
-            pip install torchvision-extra-decoders &&
             cp -f dist/*.whl {dest_dir}
           CIBW_TEST_SKIP: "*"
 

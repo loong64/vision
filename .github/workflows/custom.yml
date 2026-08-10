@@ -33,11 +33,12 @@ jobs:
         uses: docker/setup-qemu-action@v4
 
       - name: Build wheels
-        uses: loong64/cibuildwheel@v3.4.1
+        uses: loong64/cibuildwheel@v4.1.0
         env:
           CIBW_MANYLINUX_LOONGARCH64_IMAGE: "ghcr.io/loong64/manylinuxloongarch64-builder:cpu-loongarch64"
           CIBW_ARCHS: loongarch64
           CIBW_BUILD: ${{ matrix.platform }}
+          CIBW_BUILD_FRONTEND: "pip"
           CIBW_BUILD_VERBOSITY: 1
           CIBW_BEFORE_ALL_LINUX: >
             yum install -y ccache libwebp-devel libjpeg-turbo-devel libpng-devel
@@ -56,8 +57,6 @@ jobs:
               abs_pkg=$(realpath $pkg)
               repair_manylinux_2_38.sh $abs_pkg
             done &&
-            python packaging/wheel/relocate.py &&
-            pip install torchvision-extra-decoders &&
             cp -f dist/*.whl {dest_dir}
           CIBW_TEST_SKIP: "*"
 
